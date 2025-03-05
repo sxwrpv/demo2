@@ -16,6 +16,7 @@ const Marketplace = () => {
   const [scanResult, setScanResult] = useState(null);
   const [walletAddress, setWalletAddress] = useState(null);
   const [contract, setContract] = useState(null);
+  const [cart, setCart] = useState([]);
 
   useEffect(() => {
     if (window.ethereum) {
@@ -50,6 +51,10 @@ const Marketplace = () => {
     }
   };
 
+  const addToCart = (item) => {
+    setCart([...cart, item]);
+  };
+
   const startScanner = () => {
     const scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
     scanner.render((decodedText) => {
@@ -74,7 +79,6 @@ const Marketplace = () => {
   return (
     <div className="p-6 max-w-2xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">Marketplace</h1>
-      
       <div className="mb-4 text-center">
         {walletAddress ? (
           <p className="text-green-500">Connected: {walletAddress}</p>
@@ -84,20 +88,8 @@ const Marketplace = () => {
       </div>
 
       <div className="flex gap-2 mb-4">
-        <Input
-          type="text"
-          name="name"
-          placeholder="Item name"
-          value={newItem.name}
-          onChange={handleInputChange}
-        />
-        <Input
-          type="number"
-          name="price"
-          placeholder="Price (ETH)"
-          value={newItem.price}
-          onChange={handleInputChange}
-        />
+        <Input type="text" name="name" placeholder="Item name" value={newItem.name} onChange={handleInputChange} />
+        <Input type="number" name="price" placeholder="Price (ETH)" value={newItem.price} onChange={handleInputChange} />
         <Button onClick={addItem}>List Item</Button>
       </div>
 
@@ -109,6 +101,7 @@ const Marketplace = () => {
               <p className="text-gray-500">{item.price} ETH</p>
             </CardContent>
             <Button variant="outline" onClick={() => setSelectedQR(item.id)}>Get QR</Button>
+            <Button variant="outline" onClick={() => addToCart(item)}>Add to Cart</Button>
           </Card>
         ))}
       </div>
@@ -131,4 +124,23 @@ const Marketplace = () => {
   );
 };
 
-export default Marketplace;
+const UserDashboard = () => {
+  return (
+    <div className="p-6 max-w-2xl mx-auto">
+      <h1 className="text-2xl font-bold mb-4">User Dashboard</h1>
+      <p>Manage your listed items and transactions.</p>
+    </div>
+  );
+};
+
+const ItemListing = () => {
+  return (
+    <div className="p-6 max-w-2xl mx-auto">
+      <h1 className="text-2xl font-bold mb-4">Item Listings</h1>
+      <p>View and browse items available for purchase.</p>
+    </div>
+  );
+};
+
+export { Marketplace, UserDashboard, ItemListing };
+
