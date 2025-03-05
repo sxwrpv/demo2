@@ -1,248 +1,134 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Demo 1 - Secure Web3 Shopping</title>
-    <style>
-        /* ... (keep existing CSS) ... */
-    </style>
-</head>
-<body>
-    <header>
-        <div class="header-top" role="navigation">
-            <div class="logo" aria-label="Demo 1 logo">Demo 1</div>
-            <div class="nav-items">
-                <a href="#" class="nav-link">Account</a>
-                <a href="#" class="nav-link">Orders</a>
-                <div class="cart-icon">
-                    <a href="#" class="nav-link" id="cartCounter" onclick="openCartModal()">Cart (0)</a>
-                </div>
-                <button class="wallet-btn" id="connectWallet" aria-label="Connect wallet" onclick="initWeb3()">
-                    <span class="wallet-icon">W</span>
-                    Connect Wallet
-                </button>
-            </div>
-        </div>
-    </header>
+import React, { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import QRCode from "qrcode.react";
+import { Html5QrcodeScanner } from "html5-qrcode";
+import { ethers } from "ethers";
 
-    <main>
-        <div class="hero-banner">
-            <h2>Shop with Crypto</h2>
-            <p>Connect your MetaMask wallet and enjoy seamless shopping with cryptocurrency.</p>
-            <button class="wallet-btn" onclick="initWeb3()">Get Started →</button>
-        </div>
+const contractAddress = "0xADdC9EafA31d0CeaB35d88Bed4657f77a47c55e8";
+const contractABI = [ /* ABI JSON HERE */ ];
 
-        <h2>Today's Deals</h2>
-        <div class="product-grid" id="productGrid"></div>
-    </main>
+const Marketplace = () => {
+  const [items, setItems] = useState([]);
+  const [newItem, setNewItem] = useState({ name: "", price: "" });
+  const [selectedQR, setSelectedQR] = useState(null);
+  const [scanResult, setScanResult] = useState(null);
+  const [walletAddress, setWalletAddress] = useState(null);
+  const [contract, setContract] = useState(null);
 
-    <!-- Cart Modal -->
-    <div id="cartModal" class="modal">
-        <div class="cart-content">
-            <h3>Your Cart</h3>
-            <div id="cartItems"></div>
-            <div class="cart-total">
-                Total: $<span id="cartTotal">0.00</span> (<span id="cryptoTotal">0.000 ETH</span>)
-            </div>
-            <button class="checkout-btn" id="checkoutBtn" onclick="checkout()" disabled>Checkout with Crypto</button>
-            <button class="pay-btn" onclick="closeCartModal()">Close</button>
+  useEffect(() => {
+    if (window.ethereum) {
+      window.ethereum.request({ method: "eth_accounts" }).then((accounts) => {
+        if (accounts.length > 0) {
+          setWalletAddress(accounts[0]);
+        }
+      });
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+      const marketplaceContract = new ethers.Contract(contractAddress, contractABI, signer);
+      setContract(marketplaceContract);
+    }
+  }, []);
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setNewItem({ ...newItem, [name]: value });
+  };
+
+  const addItem = async () => {
+    if (newItem.name && newItem.price && contract) {
+      try {
+        const priceInWei = ethers.utils.parseEther(newItem.price);
+        const tx = await contract.listItem(newItem.name, priceInWei);
+        await tx.wait();
+        setItems([...items, { ...newItem, id: Date.now() }]);
+        setNewItem({ name: "", price: "" });
+      } catch (error) {
+        console.error("Error listing item:", error);
+      }
+    }
+  };
+
+  const startScanner = () => {
+    const scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
+    scanner.render((decodedText) => {
+      setScanResult(decodedText);
+      scanner.clear();
+    });
+  };
+
+  const connectWallet = async () => {
+    if (window.ethereum) {
+      try {
+        const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+        setWalletAddress(accounts[0]);
+      } catch (error) {
+        console.error("Wallet connection failed", error);
+      }
+    } else {
+      alert("MetaMask is required to connect your wallet");
+    }
+  };
+
+  return (
+    <div className="p-6 max-w-2xl mx-auto">
+      <h1 className="text-2xl font-bold mb-4">Marketplace</h1>
+      
+      <div className="mb-4 text-center">
+        {walletAddress ? (
+          <p className="text-green-500">Connected: {walletAddress}</p>
+        ) : (
+          <Button onClick={connectWallet}>Connect Wallet</Button>
+        )}
+      </div>
+
+      <div className="flex gap-2 mb-4">
+        <Input
+          type="text"
+          name="name"
+          placeholder="Item name"
+          value={newItem.name}
+          onChange={handleInputChange}
+        />
+        <Input
+          type="number"
+          name="price"
+          placeholder="Price (ETH)"
+          value={newItem.price}
+          onChange={handleInputChange}
+        />
+        <Button onClick={addItem}>List Item</Button>
+      </div>
+
+      <div className="grid gap-4">
+        {items.map((item) => (
+          <Card key={item.id} className="p-4 flex justify-between">
+            <CardContent>
+              <p className="font-semibold">{item.name}</p>
+              <p className="text-gray-500">{item.price} ETH</p>
+            </CardContent>
+            <Button variant="outline" onClick={() => setSelectedQR(item.id)}>Get QR</Button>
+          </Card>
+        ))}
+      </div>
+
+      {selectedQR && (
+        <div className="mt-6 text-center">
+          <h2 className="text-lg font-bold">Transaction QR Code</h2>
+          <QRCode value={`Transaction-${selectedQR}`} size={200} />
+          <Button className="mt-2" onClick={() => setSelectedQR(null)}>Close</Button>
         </div>
+      )}
+
+      <div className="mt-6 text-center">
+        <h2 className="text-lg font-bold">Scan QR Code</h2>
+        <Button onClick={startScanner}>Start Scanner</Button>
+        <div id="reader" className="mt-4"></div>
+        {scanResult && <p className="mt-2 text-green-500">Scanned: {scanResult}</p>}
+      </div>
     </div>
+  );
+};
 
-    <script src="https://cdn.jsdelivr.net/npm/web3@1.7.4/dist/web3.min.js"></script>
-    <script>
-        let web3;
-        let connectedAccount;
-        const MERCHANT_ADDRESS = '0xD9064dF1c1DD11F17711630166f41F2d91a8cA04';
-        const CHAIN_ID = 1; // Ethereum Mainnet
-        let ethPrice = 0;
-        let cart = JSON.parse(localStorage.getItem('cart')) || [];
-
-        // ✅ Initialize Web3 & Connect Wallet
-        async function initWeb3() {
-            if (window.ethereum) {
-                try {
-                    web3 = new Web3(window.ethereum);
-                    const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
-                    connectedAccount = accounts[0];
-                    document.getElementById('connectWallet').textContent = "Wallet: " + connectedAccount.slice(0, 6) + "..." + connectedAccount.slice(-4);
-                    updateCartUI();
-                } catch (error) {
-                    console.error("User denied wallet connection", error);
-                }
-            } else {
-                alert("Please install MetaMask!");
-            }
-        }
-
-        // ✅ Fetch ETH Price
-        async function fetchEthPrice() {
-            try {
-                const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd');
-                const data = await response.json();
-                ethPrice = data.ethereum.usd;
-                renderProducts();
-            } catch (error) {
-                console.error('Failed to fetch ETH price:', error);
-            }
-        }
-
-        // ✅ Products List
-        const products = [
-            { id: 1, name: "Wireless Earbuds", price: 129.99, image: "https://via.placeholder.com/180x180" },
-            { id: 2, name: "Smart Watch", price: 89.99, image: "https://via.placeholder.com/180x180" },
-            { id: 3, name: "Bluetooth Speaker", price: 59.99, image: "https://via.placeholder.com/180x180" }
-        ];
-
-        // ✅ Render Products
-        function renderProducts() {
-            const productGrid = document.getElementById('productGrid');
-            productGrid.innerHTML = products.map(product => `
-                <div class="product-card">
-                    <div class="product-image">
-                        <img src="${product.image}" alt="${product.name}">
-                    </div>
-                    <div class="product-details">
-                        <h3 class="product-title">${product.name}</h3>
-                        <div class="product-price">
-                            <span class="fiat-price">$${product.price.toFixed(2)}</span>
-                            <span class="crypto-price">${(product.price / ethPrice).toFixed(6)} ETH</span>
-                        </div>
-                        <button class="add-to-cart" onclick="addToCart(${product.id})">Add to Cart</button>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        // ✅ Add to Cart
-        function addToCart(productId) {
-            const product = products.find(p => p.id === productId);
-            if (product) {
-                cart.push({ ...product, cryptoPrice: (product.price / ethPrice).toFixed(6) });
-                updateCartUI();
-                localStorage.setItem('cart', JSON.stringify(cart));
-            }
-        }
-
-        // ✅ Remove from Cart
-        function removeFromCart(index) {
-            cart.splice(index, 1);
-            updateCartUI();
-            localStorage.setItem('cart', JSON.stringify(cart));
-        }
-
-        // ✅ Update Cart UI
-        function updateCartUI() {
-            document.getElementById('cartCounter').textContent = `Cart (${cart.length})`;
-            const cartItems = document.getElementById('cartItems');
-            const cartTotal = document.getElementById('cartTotal');
-            const cryptoTotal = document.getElementById('cryptoTotal');
-            const checkoutBtn = document.getElementById('checkoutBtn');
-
-            if (cart.length === 0) {
-                cartItems.innerHTML = '<div class="empty-cart">Your cart is empty.</div>';
-                cartTotal.textContent = '0.00';
-                cryptoTotal.textContent = '0.000 ETH';
-                checkoutBtn.disabled = true;
-                return;
-            }
-
-            cartItems.innerHTML = cart.map((item, index) => `
-                <div class="cart-item">
-                    <span>${item.name}</span>
-                    <span>$${item.price.toFixed(2)} (${item.cryptoPrice} ETH)</span>
-                    <button class="remove-item" onclick="removeFromCart(${index})">Remove</button>
-                </div>
-            `).join('');
-
-            const total = cart.reduce((sum, item) => sum + item.price, 0);
-            const cryptoTotalValue = (total / ethPrice).toFixed(6);
-            cartTotal.textContent = total.toFixed(2);
-            cryptoTotal.textContent = cryptoTotalValue;
-            checkoutBtn.disabled = !connectedAccount;
-        }
-
-        // ✅ Crypto Checkout
-        async function checkout() {
-            const totalEth = parseFloat(document.getElementById('cryptoTotal').textContent);
-            try {
-                const tx = await web3.eth.sendTransaction({
-                    from: connectedAccount,
-                    to: MERCHANT_ADDRESS,
-                    value: web3.utils.toWei(totalEth.toString(), 'ether'),
-                    gas: 30000
-                });
-                alert(`Payment successful! TX Hash: ${tx.transactionHash}`);
-                cart = [];
-                updateCartUI();
-                localStorage.removeItem('cart');
-            } catch (error) {
-                alert('Payment failed: ' + error.message);
-            }
-        }
-
-        // ✅ Load Everything
-        window.addEventListener('load', async () => {
-            await fetchEthPrice();
-            renderProducts();
-            updateCartUI();
-        });
-    </script>
-</body>
-</html>
-
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
-
-contract EscrowMarketplace {
-    address public owner;
-    struct Order {
-        address buyer;
-        address seller;
-        uint256 amount;
-        bool sellerConfirmed;
-        bool buyerConfirmed;
-    }
-
-    mapping(bytes32 => Order) public orders;
-
-    event OrderCreated(bytes32 orderId, address buyer, address seller, uint256 amount);
-    event SellerConfirmed(bytes32 orderId);
-    event BuyerConfirmed(bytes32 orderId);
-    event PaymentReleased(bytes32 orderId, address seller);
-
-    modifier onlyBuyer(bytes32 orderId) {
-        require(msg.sender == orders[orderId].buyer, "Not buyer");
-        _;
-    }
-
-    modifier onlySeller(bytes32 orderId) {
-        require(msg.sender == orders[orderId].seller, "Not seller");
-        _;
-    }
-
-    constructor() {
-        owner = msg.sender;
-    }
-
-    function createOrder(address _seller) external payable {
-        require(msg.value > 0, "Must send ETH");
-        bytes32 orderId = keccak256(abi.encodePacked(msg.sender, _seller, msg.value, block.timestamp));
-        orders[orderId] = Order(msg.sender, _seller, msg.value, false, false);
-        emit OrderCreated(orderId, msg.sender, _seller, msg.value);
-    }
-
-    function confirmShipment(bytes32 orderId) external onlySeller(orderId) {
-        orders[orderId].sellerConfirmed = true;
-        emit SellerConfirmed(orderId);
-    }
-
-    function confirmReceipt(bytes32 orderId) external onlyBuyer(orderId) {
-        require(orders[orderId].sellerConfirmed, "Seller must confirm first");
-        orders[orderId].buyerConfirmed = true;
-        payable(orders[orderId].seller).transfer(orders[orderId].amount);
-        emit BuyerConfirmed(orderId);
-        emit PaymentReleased(orderId, orders[orderId].seller);
-    }
-}
+export default Marketplace;
