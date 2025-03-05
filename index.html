@@ -6,7 +6,7 @@
     <title>Amazon-like Web3 Marketplace</title>
     <style>
         /* Basic Styling */
-        body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f5f5f5; }
         .header-top { display: flex; justify-content: space-between; padding: 10px 20px; background: #232f3e; color: white; }
         .logo { font-size: 20px; font-weight: bold; }
         .nav-items a { color: white; margin-left: 15px; text-decoration: none; }
@@ -14,6 +14,10 @@
         .product-card { border: 1px solid #ddd; padding: 10px; text-align: center; background: white; }
         .cart-modal { position: fixed; top: 0; right: 0; width: 300px; height: 100%; background: white; padding: 20px; box-shadow: -2px 0 10px rgba(0,0,0,0.2); display: none; }
         .checkout-btn { background: #ff9900; color: white; padding: 10px; border: none; cursor: pointer; width: 100%; }
+        .categories { display: flex; gap: 15px; padding: 10px; justify-content: center; }
+        .order-history { padding: 20px; }
+        .seller-dashboard { padding: 20px; background: white; margin: 20px; border-radius: 5px; }
+        .reviews { padding: 10px; }
     </style>
 </head>
 <body>
@@ -22,10 +26,19 @@
             <div class="logo">Web3 Marketplace</div>
             <div class="nav-items">
                 <a href="#" onclick="openCart()">Cart (<span id="cartCount">0</span>)</a>
+                <a href="#" onclick="showOrderHistory()">Orders</a>
                 <a href="#" onclick="connectWallet()">Connect Wallet</a>
+                <a href="#" onclick="showSellerDashboard()">Seller Dashboard</a>
             </div>
         </div>
     </header>
+    
+    <div class="categories">
+        <button onclick="filterCategory('All')">All</button>
+        <button onclick="filterCategory('Electronics')">Electronics</button>
+        <button onclick="filterCategory('Clothing')">Clothing</button>
+        <button onclick="filterCategory('Accessories')">Accessories</button>
+    </div>
     
     <main>
         <h2 style="text-align:center">Today's Deals</h2>
@@ -39,15 +52,33 @@
         <button onclick="closeCart()">Close</button>
     </div>
 
+    <div id="orderHistory" class="order-history" style="display:none">
+        <h3>Your Orders</h3>
+        <div id="orderList"></div>
+    </div>
+
+    <div id="sellerDashboard" class="seller-dashboard" style="display:none">
+        <h3>Seller Dashboard</h3>
+        <input type="text" id="productName" placeholder="Product Name">
+        <input type="number" id="productPrice" placeholder="Price (USD)">
+        <select id="productCategory">
+            <option value="Electronics">Electronics</option>
+            <option value="Clothing">Clothing</option>
+            <option value="Accessories">Accessories</option>
+        </select>
+        <button onclick="addProduct()">List Product</button>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/web3@1.7.4/dist/web3.min.js"></script>
     <script>
         let web3;
         let connectedAccount;
         let cart = [];
-        const products = [
-            { id: 1, name: "Laptop", price: 1000, image: "https://via.placeholder.com/150" },
-            { id: 2, name: "Phone", price: 800, image: "https://via.placeholder.com/150" },
-            { id: 3, name: "Headphones", price: 200, image: "https://via.placeholder.com/150" }
+        let orders = [];
+        let products = [
+            { id: 1, name: "Laptop", price: 1000, category: "Electronics", image: "https://via.placeholder.com/150" },
+            { id: 2, name: "Phone", price: 800, category: "Electronics", image: "https://via.placeholder.com/150" },
+            { id: 3, name: "Headphones", price: 200, category: "Accessories", image: "https://via.placeholder.com/150" }
         ];
 
         async function connectWallet() {
@@ -65,9 +96,11 @@
             }
         }
 
-        function renderProducts() {
+        function renderProducts(filter = "All") {
             const productGrid = document.getElementById('productGrid');
-            productGrid.innerHTML = products.map(product => `
+            productGrid.innerHTML = products
+                .filter(p => filter === "All" || p.category === filter)
+                .map(product => `
                 <div class="product-card">
                     <img src="${product.image}" alt="${product.name}">
                     <h3>${product.name}</h3>
@@ -83,37 +116,22 @@
             document.getElementById('cartCount').innerText = cart.length;
         }
 
-        function openCart() {
-            document.getElementById('cartModal').style.display = 'block';
-            document.getElementById('cartItems').innerHTML = cart.map(item => `<p>${item.name} - $${item.price}</p>`).join('');
+        function showSellerDashboard() {
+            document.getElementById('sellerDashboard').style.display = 'block';
         }
 
-        function closeCart() {
-            document.getElementById('cartModal').style.display = 'none';
-        }
-
-        async function checkout() {
-            if (!connectedAccount) {
-                alert("Please connect your wallet first.");
-                return;
-            }
-            const totalPrice = cart.reduce((sum, item) => sum + item.price, 0);
-            try {
-                await web3.eth.sendTransaction({
-                    from: connectedAccount,
-                    to: "0xADdC9EafA31d0CeaB35d88Bed4657f77a47c55e8",
-                    value: web3.utils.toWei((totalPrice / 2000).toFixed(6), 'ether')
-                });
-                alert("Payment Successful!");
-                cart = [];
-                document.getElementById('cartCount').innerText = 0;
-                closeCart();
-            } catch (error) {
-                alert("Payment Failed: " + error.message);
+        function addProduct() {
+            const name = document.getElementById('productName').value;
+            const price = document.getElementById('productPrice').value;
+            const category = document.getElementById('productCategory').value;
+            if (name && price) {
+                products.push({ id: products.length + 1, name, price, category, image: "https://via.placeholder.com/150" });
+                renderProducts();
+                alert("Product Listed!");
             }
         }
 
-        window.onload = renderProducts;
+        window.onload = () => renderProducts();
     </script>
 </body>
 </html>
